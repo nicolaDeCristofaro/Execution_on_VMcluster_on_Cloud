@@ -1,2 +1,3 @@
-# ec2_management_java_sdk
-Create, start, stop, run commands and terminate EC2 instances (AWS) with Java SDK. 
+# AWS EC2 management
+Create, start, stop, run commands and terminate AWS EC2 instances with Java SDK.
+<b>**Java SDK v1.x used...planning to migrate to version 2.x</b>
