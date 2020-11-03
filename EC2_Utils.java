@@ -386,29 +386,19 @@ public class EC2_Utils {
 		getCommandInvocationRequest.setInstanceId(instanceId);
 		
 		//wait until the command is executed
-		/*The waiter exists (AWSSimpleSystemsManagementWaiters) but it seems not be present in the library
-		so I check if the command is executed and terminated manually
-		 */
-		GetCommandInvocationResult getCommandInvocationResult = new GetCommandInvocationResult();
-		while(true) {
-			getCommandInvocationResult = ssm.getCommandInvocation(getCommandInvocationRequest);
-			String status = getCommandInvocationResult.getStatusDetails();
-			if(status.equals("Success")) {
-				System.out.println("\nThe output of the command executed is the following:");
-				System.out.println(getCommandInvocationResult.getStandardOutputContent());
-				break;
-			}else if(status.equals("InProgress") || status.equals("Delayed") || status.equals("Pending")) {
-				try {
-					Thread.sleep(5000);
-					continue;
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}else {
-				System.out.println("There are problems executing this command, the status is:  "+ status);
-				System.out.println(getCommandInvocationResult.getStandardErrorContent());
-				break;
-			}
+		WaiterParameters<GetCommandInvocationRequest> paramsCommand = new WaiterParameters<GetCommandInvocationRequest>(getCommandInvocationRequest);
+		AWSSimpleSystemsManagementWaiters ssmWaiter = new AWSSimpleSystemsManagementWaiters(ssm);
+		ssmWaiter.commandExecuted().run(paramsCommand);
+		
+		//Get the command result
+		GetCommandInvocationResult getCommandInvocationResult = ssm.getCommandInvocation(getCommandInvocationRequest);
+		String status = getCommandInvocationResult.getStatusDetails();
+		if(status.equals("Success")) {
+			System.out.println("\nThe output of the command executed is the following:");
+			System.out.println(getCommandInvocationResult.getStandardOutputContent());
+		}else {
+			System.out.println("There are problems executing this command, the status is:  "+ status);
+			System.out.println(getCommandInvocationResult.getStandardErrorContent());
 		}
 		
 	}
