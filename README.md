@@ -1,16 +1,14 @@
-# Program Execution on AWS EC2 with Java SDK
-A typical situation is the execution of a program locally and then the same execution on a virtual machine on the Cloud, perhaps with more cores to understand the difference in performance, usually in the benchmarks of parallel programs.
+# Execution on a cluster of Virtual Machines on Cloud
+A typical situation is the execution of a program (usally a computation-intensive algorithm) on a cluster of virtual machines on Cloud. In this way it is possible to take advantage of parallelization to obtain better performance.
 
-In this scenario, the programmer would have to manually do the following:
-
-- launch a VM
-- configure the VM
-- upload the program to be executed on the VM
-- log in to the VM
-- run the program
+In this scenario, the programmer would have to manually do the following operations:
+- configure and launch the cluster of Virtual Machines
+- upload the program to be executed on each instance of the cluster
+- log in on each instance of the cluster
+- run the program in parallel on each instance of the cluster
 - deallocate all the resources used
 
-It can be seen that such a procedure could be very tedious. For this reason, through the Java SDK for AWS I have created this project that allows you to automatically perform all the operations described above.
+It can be seen that such a procedure could be very tedious. For this reason, through the Java SDK made available by the various cloud providers, I have created this project that allows you to automatically perform all the operations described above.
 
 Also, creating and killing the VM on every run can take a lot of time. To optimize times, the programmer was given the choice with the setting of a "persistence" parameter.
 
