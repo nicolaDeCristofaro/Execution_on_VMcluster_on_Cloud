@@ -14,7 +14,7 @@ It can be seen that such a procedure could be very tedious. For this reason, thr
 
 - **Input:** A matrix **A** of size m x n and a vector **x** of length n
 - **Output:** the product of the matrix by the vector denoted as
-    \[ c = A \cdot x \]
+    c = A \cdot x
     where c is also a vector of length n and its element at index i is defined as:
     \[ c[i] =  \sum_{j=0}^{n-1} A[i,j] \cdot x[j]\]
 
