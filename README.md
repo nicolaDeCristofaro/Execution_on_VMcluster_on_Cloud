@@ -16,7 +16,8 @@ It can be seen that such a procedure could be very tedious. For this reason, thr
 - **Output:** the product of the matrix by the vector denoted as <br>
 ![equation](https://latex.codecogs.com/png.image?\dpi{110}\bg{white}c&space;=&space;A&space;\cdot&space;x)
 <br>
-    where **c** is also a vector of length n and its element at index **i** is defined as: <br>
+where **c** is also a vector of length n and its element at index **i** is defined as: 
+<br>
 ![equation](https://latex.codecogs.com/png.image?\dpi{110}\bg{white}c[i]&space;=&space;&space;\sum_{j=0}^{n-1}&space;A[i,j]&space;\cdot&space;x[j])
 <br>
 
