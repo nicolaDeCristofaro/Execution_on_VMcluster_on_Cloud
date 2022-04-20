@@ -12,6 +12,23 @@ It can be seen that such a procedure could be very tedious. For this reason, thr
 
 ## Example: Matrix-Vector Multiplication execution on VM cluster on Cloud
 
+- **Input:** A matrix **A** of size m x n and a vector **x** of length n
+- **Output:** the product of the matrix by the vector denoted as
+    \[ c = A \cdot x \]
+    where c is also a vector of length n and its element at index i is defined as:
+    \[ c[i] =  \sum_{j=0}^{n-1} A[i,j] \cdot x[j]\]
+
+
+
+
+
+
+
+
+
+
+
+
 Also, creating and killing the VM on every run can take a lot of time. To optimize times, the programmer was given the choice with the setting of a "persistence" parameter.
 
 - If <b>"persistence = true"</b> then before creating a VM, you check if there is an already allocated VM that has the same desired characteristics, and use that for execution. At the end the latter is not finished, but is ready for a subsequent execution.
