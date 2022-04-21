@@ -54,7 +54,7 @@ import com.microsoft.azure.storage.queue.CloudQueueMessage;
 import com.microsoft.rest.LogLevel;
 
 public class AzureClient {
-	private final static Logger LOGGER = Logger.getLogger("FLY on Azure");
+	private final static Logger LOGGER = Logger.getLogger("VM Cluster exec on Azure");
 
 	private String clientId;
 	private String tenantId;
@@ -68,10 +68,6 @@ public class AzureClient {
 	private ResourceGroup resourceGroup;
 	private StorageAccount storageAccount;
 	private CloudStorageAccount cloudStorageAccount;
-
-	private String appSimpleName;
-	private String appName;
-	private String masterKey;
 
 	private HashMap<String, CloudQueue> queues;
 	
@@ -128,13 +124,13 @@ public class AzureClient {
 
 	private void createResourceGroup() {
 		LOGGER.info("Creating resource group...");
-		this.resourceGroup = azure.resourceGroups().define("flyrg" + id).withRegion(region).create();
-		LOGGER.info("Resource group 'flyrg" + id + "' created");
+		this.resourceGroup = azure.resourceGroups().define("vmclusterexecrg" + id).withRegion(region).create();
+		LOGGER.info("Resource group 'vmclusterexecrg" + id + "' created");
 	}
 
 	private void createStorageAccount() throws InvalidKeyException, URISyntaxException {
 		LOGGER.info("Creating storage account...");
-		this.storageAccount = azure.storageAccounts().define("flysa" + id).withRegion(region)
+		this.storageAccount = azure.storageAccounts().define("clustersa" + id).withRegion(region)
 				.withExistingResourceGroup(this.resourceGroup).withSku(StorageAccountSkuType.STANDARD_LRS).create();
 
 		String storageConnectionString = "DefaultEndpointsProtocol=https;" + "AccountName=" + storageAccount.name()
@@ -142,7 +138,7 @@ public class AzureClient {
 				+ "EndpointSuffix=core.windows.net";
 		// Connect to azure storage account
 		cloudStorageAccount = CloudStorageAccount.parse(storageConnectionString);
-		LOGGER.info("Storage account 'flysa" + id + "' created");
+		LOGGER.info("Storage account 'clustersa" + id + "' created");
 	}
 
 	public String uploadFile(java.io.File file)
@@ -268,31 +264,6 @@ public class AzureClient {
 		return result.toString();
 	}
 
-	private String getMasterKey() throws IOException {
-		String token = getOAuthToken();
-
-		URL url = new URL("https://management.azure.com/subscriptions/" + subscriptionId + "/resourceGroups/"
-				+ resourceGroup.name() + "/providers/Microsoft.Web/sites/" + appName
-				+ "/hostruntime/admin/host/systemkeys/_master?api-version=2015-08-01");
-		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-		// Set connections properties
-		connection.setDoOutput(true);
-		connection.setDoInput(true);
-		connection.setRequestMethod("POST");
-		connection.setRequestProperty("Authorization", "Bearer " + token);
-		connection.getOutputStream().close();
-
-		Gson gson = new GsonBuilder().create();
-		JsonReader jsonReader = gson.newJsonReader(new InputStreamReader(connection.getInputStream()));
-		MasterKeyReply masterKeyReply = gson.fromJson(jsonReader, MasterKeyReply.class);
-		return masterKeyReply.value;
-	}
-
-	private class MasterKeyReply {
-		String value;
-	}
-
 	//VM Cluster handling methods
 	public void VMClusterInit() throws InvalidKeyException, URISyntaxException {
 		
@@ -307,7 +278,7 @@ public class AzureClient {
 		
 		boolean storageAccountFound = false;
 		for (StorageAccount sa : azure.storageAccounts().list()) {
-			if (sa.name().contains("vmclusterexecsa")) {
+			if (sa.name().contains("clustersa")) {
 				this.storageAccount = sa;
 				
 				String storageConnectionString = "DefaultEndpointsProtocol=https;" + "AccountName=" + this.storageAccount.name()

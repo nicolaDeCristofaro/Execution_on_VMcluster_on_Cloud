@@ -2,6 +2,7 @@ package vmclusterclient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -21,6 +22,7 @@ import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 
 import awsclient.AWSClient;
+import azureclient.AzureClient;
 
 public class VMClusterExecution {
 	
@@ -33,6 +35,12 @@ public class VMClusterExecution {
 	static Integer vmCount = 2;
 	
 	static LinkedTransferQueue<String> __results__local_queue  = new LinkedTransferQueue<String>();
+	static LinkedTransferQueue<String> __termination__local_queue  = new LinkedTransferQueue<String>();
+	
+	static int splitCount = 0;
+	static int vmCountToUse = 0;
+	static int numberOfFunctions = 0;
+	static int notUsedVMs = 0;
 
 	public static void main(String[] args) throws Exception{
 		
@@ -42,7 +50,7 @@ public class VMClusterExecution {
 		String vmType = "t2.micro";
 		String purchasingOption = "on-demand";
 		int vmCount = 2;
-		boolean persistent = true;
+		boolean persistent = false;
 		String region = "eu-west-2";
 
 		if (args.length == 6) {
@@ -74,11 +82,13 @@ public class VMClusterExecution {
 			}
 		}
 		
+		ArrayList<String> portionInputs = new ArrayList<String>();
+		
 		//cloud support: AWS & Azure...extensible to other cloud providers
 		switch(cloud) {
 			case "aws":
 				
-				BasicAWSCredentials creds = new BasicAWSCredentials("", ""); //insert here your AWS credentials
+				BasicAWSCredentials creds = new BasicAWSCredentials("***", "***"); //insert here your AWS credentials
 				
 				//create SQS client to handle messages on queue on AWS
 				AmazonSQS __sqs_aws = AmazonSQSClientBuilder.standard()
@@ -89,7 +99,6 @@ public class VMClusterExecution {
 				//Create onCloud queue and local queue that receives termination messages from onCloud queue
 				__wait_on_termination_queue=true;
 				__sqs_aws.createQueue(new CreateQueueRequest("termination-queue-"+__id_execution));
-				LinkedTransferQueue<String> __termination__local_queue  = new LinkedTransferQueue<String>();
 				final String __termination_queue_url = __sqs_aws.getQueueUrl("termination-queue-"+__id_execution).getQueueUrl();
 				for(int __i=0;__i< numLocalThreadsUsed;__i++){ 
 					__thread_pool_local.submit(new Callable<Object>() {
@@ -163,46 +172,7 @@ public class VMClusterExecution {
 				String mainClass = "vmclusterclient.FunctionToExecute_aws";
 				awsClient.buildProjectOnVMCluster(mainClass);
 				
-				//Balanced distribution of job/input matrix to VM cluster instances
-				int splitCount = vCPUsCount * vmCount;
-				int vmCountToUse = vmCount;
-				ArrayList<StringBuilder> __temp_matrix = new ArrayList<StringBuilder>();
-				ArrayList<String> portionInputs = new ArrayList<String>();
-				
-				int __rows = matrix.length;
-				int __cols = matrix[0].length;
-				
-				int __current_row_matrix = 0;
-																	
-				if ( __rows < splitCount) splitCount = __rows;
-				if ( splitCount < vmCountToUse) vmCountToUse = splitCount;
-											
-				int[] dimPortions = new int[splitCount]; 
-				int[] displ = new int[splitCount]; 
-				int offset = 0;
-											
-				for(int __i=0;__i<splitCount;__i++){
-					dimPortions[__i] = (__rows / splitCount) + ((__i < (__rows % splitCount)) ? 1 : 0);
-					displ[__i] = offset;								
-					offset += dimPortions[__i];
-												
-					__temp_matrix.add(__i,new StringBuilder());
-					__temp_matrix.get(__i).append("{\"portionRows\":"+dimPortions[__i]+",\"portionCols\":"+__cols+",\"portionIndex\":"+__i+",\"portionDisplacement\":"+displ[__i]+",\"portionValues\":[");							
-						
-					for(int __j=__current_row_matrix; __j<__current_row_matrix+dimPortions[__i];__j++){
-						for(int __z = 0; __z<matrix[__j].length;__z++){
-							__temp_matrix.get(__i).append("{\"x\":"+__j+",\"y\":"+__z+",\"value\":"+matrix[__j][__z]+"},");
-						}
-						if(__j == __current_row_matrix + dimPortions[__i]-1) {
-							__temp_matrix.get(__i).deleteCharAt(__temp_matrix.get(__i).length()-1);
-							__temp_matrix.get(__i).append("]}");
-						}
-					}
-					__current_row_matrix +=dimPortions[__i];
-					portionInputs.add(__generateString(__temp_matrix.get(__i).toString(),7));
-				}
-				int numberOfFunctions = splitCount;
-				int notUsedVMs = vmCount - vmCountToUse;
+				portionInputs = splittingCreation(vCPUsCount, matrix);
 				
 				System.out.print("\n\u27A4 Waiting for building project on VM CLuster to complete...");
 				if(vmsCreatedCount != vmCount){
@@ -237,6 +207,9 @@ public class VMClusterExecution {
 					aggregateResults();
 				}
 				
+				//Clear termination queue for eventual next iteration
+				__termination__local_queue.clear();
+				
 				//Delete documents with commands
 				awsClient.cleanResources();
 				
@@ -250,12 +223,181 @@ public class VMClusterExecution {
 								
 				break;
 			case "azure":
+				final String __termination_queue_name = "termination-queue-"+__id_execution;
+				
+				AzureClient azure = new AzureClient("***",  //insert here your clientID
+									"***", //insert here your tenantID
+									"***", //insert here your secretKey
+									"***", //insert here your subscriptionID
+									__id_execution+"",
+									region,
+									__termination_queue_name);
+				
+				azure.VMClusterInit();
+							
+				//Create onCloud queue and local queue that receives termination messages from onCloud queue
+				__wait_on_termination_queue=true;
+				azure.createQueue("termination-queue-"+__id_execution);
+				
+				__thread_pool_local.submit(new Callable<Object>() {
+					@Override
+					public Object call() throws Exception {
+						while(__wait_on_termination_queue) {
+							List<String> __recMsgs = azure.peeksFromQueue("termination-queue-"+__id_execution,10);
+							for(String msg : __recMsgs) { 
+								__termination__local_queue.put(msg);
+							}
+						}
+						return null;
+					}
+				});
+								
+				__wait_on_results_queue=true;
+				azure.createQueue("results-queue-"+__id_execution);
+				//for(int __i=0;__i< (Integer)__fly_environment.get("smp").get("nthread");__i++){ 
+					__thread_pool_local.submit(new Callable<Object>() {
+						@Override
+						public Object call() throws Exception {
+							while(__wait_on_results_queue) {
+								List<String> __recMsgs = azure.peeksFromQueue("results-queue-"+__id_execution,1);
+								for(String msg : __recMsgs) { 
+									__results__local_queue.put(msg);
+								}
+							}
+							return null;
+						}
+					});
+				//}
+					
+				int vCPUsCount_az = azure.getVCPUsCount(vmType);
+				
+				azure.zipAndUploadCurrentProject();
+						
+				int vmsCreatedCount_az = azure.launchVMCluster(vmType, purchasingOption, persistent, vmCount);
+				
+				if ( vmsCreatedCount_az != 0) {
+					System.out.print("\n\u27A4 Waiting for virtual machines boot script to complete...");
+					while ( __termination__local_queue.size() != vmsCreatedCount_az);
+					System.out.println("Done");
+				}
+				if(vmsCreatedCount_az != vmCount){
+					if ( vmsCreatedCount_az > 0) azure.downloadFLYProjectonVMCluster();
+					
+					System.out.print("\n\u27A4 Waiting for download project on VM CLuster to complete...");
+					while (__termination__local_queue.size() != (vmCount+vmsCreatedCount_az));
+				}
+				System.out.println("Done");
+				
+				String mainClass_az = "vmclusterclient.FunctionToExecute_azure";
+				azure.buildFLYProjectOnVMCluster(mainClass_az);
+				
+				portionInputs = splittingCreation(vCPUsCount_az, matrix);
+				
+				System.out.print("\n\u27A4 Waiting for building project on VM CLuster to complete...");
+				if(vmsCreatedCount_az != vmCount){
+					while ( __termination__local_queue.size() != ( (vmCount*2)+vmsCreatedCount_az));
+				} else {
+					while (__termination__local_queue.size() != (vmCount*2));
+				}
+				System.out.println("Done");
+				
+				//Check for building errors
+				String err_build_az = azure.checkBuildingStatus();
+				if (err_build_az != null) {
+					//Print the error within each VM
+					System.out.println("The building failed with the following errors in each VM:");
+					System.out.println(err_build_az);
+					return;
+				}
+				
+				azure.executeFLYonVMCluster(portionInputs,
+						numberOfFunctions,
+						__id_execution);
+
+				System.out.print("\n\u27A4 Waiting for FLY execution to complete...");
+				if(vmsCreatedCount_az != vmCount){
+					while (__termination__local_queue.size() != ( (vmCount*3)+vmsCreatedCount_az-notUsedVMs));
+				} else {
+					while (__termination__local_queue.size() != (vmCount*3-notUsedVMs ));
+				}
+				__wait_on_termination_queue=false;
+				System.out.println("Done");
+				
+				//Check for execution errors
+				String err_exec_az = azure.checkForExecutionErrors();
+				if (err_exec_az != null) {
+					//Print the error within each VM
+					System.out.println("The execution failed with the following errors in each VM:");
+					System.out.println(err_exec_az);
+				}else {
+					//No execution errors
+					//Manage the callback
+					aggregateResults();
+				}
+
+				//Clear termination queue for eventual next iteration
+				__termination__local_queue.clear();
+				
+				__wait_on_results_queue=false;
+				
+				azure.deleteResourcesAllocated();
+				
+				__thread_pool_local.shutdown();
+								
 				break;
 			default:
 				System.out.println("Cloud provider "+cloud+" not supported yet");
 				System.exit(-1);
 		}
 		System.exit(0);
+	}
+	
+	protected static ArrayList<String> splittingCreation(int vCPUsCount, Integer[][] matrix) {
+		
+		//Balanced distribution of job/input matrix to VM cluster instances
+		splitCount = vCPUsCount * vmCount;
+		vmCountToUse = vmCount;
+		
+		ArrayList<StringBuilder> __temp_matrix = new ArrayList<StringBuilder>();
+		ArrayList<String> portionInputs = new ArrayList<String>();
+		
+		int __rows = matrix.length;
+		int __cols = matrix[0].length;
+		
+		int __current_row_matrix = 0;
+															
+		if ( __rows < splitCount) splitCount = __rows;
+		if ( splitCount < vmCountToUse) vmCountToUse = splitCount;
+									
+		int[] dimPortions = new int[splitCount]; 
+		int[] displ = new int[splitCount]; 
+		int offset = 0;
+									
+		for(int __i=0;__i<splitCount;__i++){
+			dimPortions[__i] = (__rows / splitCount) + ((__i < (__rows % splitCount)) ? 1 : 0);
+			displ[__i] = offset;								
+			offset += dimPortions[__i];
+										
+			__temp_matrix.add(__i,new StringBuilder());
+			__temp_matrix.get(__i).append("{\"portionRows\":"+dimPortions[__i]+",\"portionCols\":"+__cols+",\"portionIndex\":"+__i+",\"portionDisplacement\":"+displ[__i]+",\"portionValues\":[");							
+				
+			for(int __j=__current_row_matrix; __j<__current_row_matrix+dimPortions[__i];__j++){
+				for(int __z = 0; __z<matrix[__j].length;__z++){
+					__temp_matrix.get(__i).append("{\"x\":"+__j+",\"y\":"+__z+",\"value\":"+matrix[__j][__z]+"},");
+				}
+				if(__j == __current_row_matrix + dimPortions[__i]-1) {
+					__temp_matrix.get(__i).deleteCharAt(__temp_matrix.get(__i).length()-1);
+					__temp_matrix.get(__i).append("]}");
+				}
+			}
+			__current_row_matrix +=dimPortions[__i];
+			portionInputs.add(__generateString(__temp_matrix.get(__i).toString(),7));
+		}
+		numberOfFunctions = splitCount;
+		notUsedVMs = vmCount - vmCountToUse;
+		
+		return portionInputs;
+		
 	}
 	
 	protected static  Object aggregateResults()throws Exception{
