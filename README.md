@@ -52,6 +52,8 @@ In this example the program is executed on a cluster of 2 virtual machines of ty
 
 **\*If you want to execute a differente program change the implementation of matrix-vector multiplication with the implementation of yout program and change the method called to aggregate the partial results into the final result.**
 
+**\*If you want to switch Cloud provider just specify it in run parameters (the Cloud providers until now supported are AWS and Azure).**
+
 ## What happens when the program is launched
 Whichever cloud provider is chosen, the sequence of operations performed when launching the execution is as follows (the refernce file is [here](https://github.com/nicolaDeCristofaro/Execution_on_VMcluster_on_Cloud/blob/main/src/main/java/vmclusterclient/VMClusterExecution.java)):
 1. Declaration and initialization of the matrix with random integers (lines 72 to 83)
@@ -68,6 +70,4 @@ Whichever cloud provider is chosen, the sequence of operations performed when la
 8. When the building phase has been successfully completed on all instances of the cluster, parallel execution is launched on all machines. Each virtual machine retrieves its portion of input written on a file in JSON format, performs its computation (in this case the multiplication with the vector) and publishes its partial result on the result queue (lines 177 to 187 for AWS - lines 296 to 316 for azure)
 9. When all virtual machines in the cluster have completed their computation, i.e. when all termination messages have been received, all messages from the result queue are retrieved and a function is called that aggregates all partial results into the final result (in this case the result vector) (lines 189 to 208 for AWS - lines 317 to 336 for azure)
 10. Finally, the resources allocated on the Cloud are terminated if required, otherwise the resources remain ready for a possible subsequent execution (lines 211 to 222 for AWS - lines 339 to 345 for azure)
-
-## How to switch Cloud Provider
 
