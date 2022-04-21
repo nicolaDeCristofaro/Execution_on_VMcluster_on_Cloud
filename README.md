@@ -43,9 +43,9 @@ In this figure we can see a resolved example.<br>
 	- If no parameters are provided, the default ones are used (a cluster of 2 virtual machines t2.micro on-demand on AWS)
 
 This is an example of parameters:
-'''
+```
 aws t3.micro on-demand 2 false eu-west-2
-''
+```
 In this example the program is executed on a cluster of 2 virtual machines of type "t3.micro" on AWS in London(eu-west-2) region, on-demand and with the will to terminate all the resources used at the end od the computation.
 
 **\*Remember to insert your credentials to access resources on the chosen cloud provider.**
