@@ -25,7 +25,7 @@ In this figure we can see a resolved example.<br>
 
 
 ## What happens when the program is launched
-Whichever cloud provider is chosen, the sequence of operations performed when launching the execution is as follows (the refernce file is [link](https://github.com/nicolaDeCristofaro/Execution_on_VMcluster_on_Cloud/blob/main/)):
+Whichever cloud provider is chosen, the sequence of operations performed when launching the execution is as follows (the refernce file is [here](https://github.com/nicolaDeCristofaro/Execution_on_VMcluster_on_Cloud/blob/main/src/main/java/vmclusterclient/VMClusterExecution.java)):
 1. Declaration and initialization of the matrix with random integers (lines 72 to 83)
 2. Creation of queues on the chosen cloud provider: the termination queue where the termination messages will arrive, for example when the cluster instances finish their computation and the results queue where the partial results of the computations will be published.
 	- these queues on the cloud have their corresponding queue locally, so some threads take care of checking if there are messages arriving on the queues on the cloud, retrieve them and bring them back to the local queues. (lines 100 to 141 for AWS - lines 238 to 270 for azure)
